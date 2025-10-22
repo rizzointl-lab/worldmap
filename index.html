@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Member Map — Custom Image</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body { height: 100%; margin: 0; }
+    .wrap { height: 100vh; display: flex; flex-direction: column; }
+    header { padding: 10px 16px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    #map { flex: 1; width: 100%; background: #000; }
+    .searchbar { display:flex; gap:8px; align-items:center; }
+    .searchbar input { flex:1; padding:8px 10px; border:1px solid #333; border-radius:6px; background:#0f0f0f; color:#eee; }
+    .searchbar input::placeholder { color:#bbb; }
+    .searchbar button { padding:8px 12px; border:1px solid #333; border-radius:6px; background:#1a1a1a; color:#eee; cursor:pointer; }
+    .map-label {
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(17,17,17,0.85);
+      color: #ffd1df;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #5a2a3a;
+      white-space: nowrap;
+    }
+    @media (max-width: 640px) {
+      .map-label { font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="searchbar">
+        <input id="q" type="search" placeholder="Search member name…" />
+        <button id="clearBtn" type="button">Clear</button>
+      </div>
+    </header>
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Image dimensions will be detected at runtime for fitBounds if needed.
+    const imgPath = './assets/world-custom.png';
+    const dataPath = './assets/members_xy.json';
+
+    // We'll probe the image size to set bounds dynamically
+    const probe = new Image();
+    probe.onload = () => {
+      const imgWidth = probe.naturalWidth;
+      const imgHeight = probe.naturalHeight;
+      const bounds = [[0,0],[imgHeight, imgWidth]];
+
+      const map = L.map('map', {
+        crs: L.CRS.Simple,
+        minZoom: -1,
+        maxZoom: 2,
+        zoomSnap: 0.25,
+        zoomDelta: 0.25,
+        zoomControl: true,
+        attributionControl: false,
+        scrollWheelZoom: false
+      });
+
+      L.imageOverlay(imgPath, bounds).addTo(map);
+      map.fitBounds(bounds);
+
+      let allMembers = [];
+      let markers = [];
+
+      fetch(dataPath)
+        .then(r => r.json())
+        .then(members => {
+          allMembers = members;
+          renderMarkers(allMembers);
+        });
+
+      function renderMarkers(list) {
+        markers.forEach(m => map.removeLayer(m));
+        markers = [];
+
+        list.forEach(m => {
+          const label = L.divIcon({
+            className: 'map-label',
+            html: m.name,
+            iconSize: [140, 26],
+            iconAnchor: [70, 13]
+          });
+          const marker = L.marker([m.y, m.x], { icon: label });
+          marker.on('click', () => { if (m.url) window.open(m.url, '_blank'); });
+          marker.addTo(map);
+          markers.push(marker);
+        });
+      }
+
+      const q = document.getElementById('q');
+      const clearBtn = document.getElementById('clearBtn');
+      q.addEventListener('input', () => {
+        const term = q.value.trim().toLowerCase();
+        if (!term) return renderMarkers(allMembers);
+        renderMarkers(allMembers.filter(m => (m.name||'').toLowerCase().includes(term)));
+      });
+      clearBtn.addEventListener('click', () => { q.value=''; renderMarkers(allMembers); });
+    };
+    probe.src = imgPath;
+  </script>
+</body>
+</html>
